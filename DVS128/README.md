@@ -1,2 +1,2 @@
-To compile dvs128.cpp
-g++ -std=c++11 -o dvs128 dvs128.cpp -lcaer
+To compile dvs128_console.cpp
+g++ -std=c++11 -fpermissive -o dvs128_console.app dvs128_console.cpp -lcaer
