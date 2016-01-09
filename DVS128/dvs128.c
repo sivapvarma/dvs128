@@ -12,78 +12,7 @@
 #define DVS128_LOG_VERBOSE
 // #define EDVS_LOG_ULTRA
 
-// ----- ----- ----- ----- ----- ----- ----- ----- ----- //
 
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <limits.h>
-
-
-int edvs_net_open(const char* address, int port)
-{
-    // open socket
-    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if(sockfd <= 0) {
-        printf("edvs_net_open: socket error %d\n", sockfd);
-        return -1;
-    }
-    // prepare address
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    // inet pton
-    int i = inet_pton(AF_INET, address, &addr.sin_addr);
-    if(i <= 0) {
-        printf("edvs_net_open: inet p_ton error %d\n", i);
-        return -1;
-    }
-    // connect
-    if(connect(sockfd, (struct sockaddr*)&addr, sizeof(addr))) {
-        printf("edvs_net_open: connect error\n");
-        return -1;
-    }
-    // return handle
-    return sockfd;
-}
-
-ssize_t edvs_net_read(int sockfd, unsigned char* data, size_t n)
-{
-    ssize_t m = recv(sockfd, data, n, 0);
-    if(m < 0) {
-        printf("edvs_net_read: recv error %zd\n", m);
-        return -1;
-    }
-    return m;
-}
-
-ssize_t edvs_net_write(int sockfd, const char* data, size_t n)
-{
-    ssize_t m = send(sockfd, data, n, 0);
-    if(m != n) {
-        printf("edvs_net_send: send error %zd\n", m);
-    }
-    return m;
-}
-
-int edvs_net_close(int sockfd)
-{
-    int r = shutdown(sockfd, SHUT_RDWR);
-    if(r != 0) {
-        printf("edvs_net_close: socket shutdown error %d\n", r);
-        return -1;
-    }
-    r = close(sockfd);
-    if(r != 0) {
-        printf("edvs_net_close: socket close error %d\n", r);
-        return -1;
-    }
-    return 0;
-}
-
-// ----- ----- ----- ----- ----- ----- ----- ----- ----- //
 
 #include <termios.h>
 #include <stdio.h>
@@ -149,6 +78,7 @@ int edvs_serial_open(const char* path, int baudrate)
     return port;
 }
 
+// not sure what these functions do ???
 ssize_t dvs128_serial_read()
 {
     
@@ -189,6 +119,8 @@ int edvs_serial_close(int port)
 /** Reads data from an edvs device */
 ssize_t edvs_device_read(edvs_device_t* dh, unsigned char* data, size_t n)
 {
+    return dvs128_serial_read(dh->handle, data, n);
+    /*
     switch(dh->type) {
     case EDVS_NETWORK_DEVICE:
         return edvs_net_read(dh->handle, data, n);
@@ -197,11 +129,14 @@ ssize_t edvs_device_read(edvs_device_t* dh, unsigned char* data, size_t n)
     default:
         return -1;
     }
+    */
 }
 
 /** Writes data to an edvs device */
 ssize_t edvs_device_write(edvs_device_t* dh, const char* data, size_t n)
 {
+    return 1; // this is a huge hack
+    /*
     switch(dh->type) {
     case EDVS_NETWORK_DEVICE:
         return edvs_net_write(dh->handle, data, n);
@@ -210,10 +145,13 @@ ssize_t edvs_device_write(edvs_device_t* dh, const char* data, size_t n)
     default:
         return -1;
     }
+    */
 }
 
 int edvs_device_write_str(edvs_device_t* dh, const char* str)
 {
+    return 0; // huge hack
+    /*
     size_t n = strlen(str);
     if(edvs_device_write(dh, str, n) != n) {
         return -1;
@@ -221,12 +159,15 @@ int edvs_device_write_str(edvs_device_t* dh, const char* str)
     else {
         return 0;
     }
+    */
 }
 
 
 /** Closes an edvs device connection */
 int edvs_device_close(edvs_device_t* dh)
 {
+    return dvs128_serial_close(dh->handle);
+    /*
     switch(dh->type) {
     case EDVS_NETWORK_DEVICE:
         return edvs_net_close(dh->handle);
@@ -235,6 +176,7 @@ int edvs_device_close(edvs_device_t* dh)
     default:
         return -1;
     }
+    */
 }
 
 // ----- ----- ----- ----- ----- ----- ----- ----- ----- //
@@ -378,6 +320,7 @@ int wait_for(edvs_device_streaming_t* s, const unsigned char* str)
     return -1;
 }
 
+// called by dvs128_run to collect events from dvs
 int edvs_device_streaming_run(edvs_device_streaming_t* s)
 {
     s->systime_offset = get_micro_time();
@@ -500,51 +443,10 @@ void compute_timestamps_systime(edvs_event_t* begin, size_t n, uint64_t last_dev
     begin->t = next_set_host; // set last here due to delayed set
 }
 
-ssize_t edvs_device_streaming_read(edvs_device_streaming_t* s, edvs_event_t* events, size_t n, edvs_special_t* special, size_t* ns)
+// the most important function of all
+// ssize_t edvs_device_streaming_read(edvs_device_streaming_t* s, edvs_event_t* events, size_t n, edvs_special_t* special, size_t* ns)
+ssize_t dvs128_device_streaming_read(dvs128_device_streaming_t* s, dvs128_event_t* events, size_t n, dvs128_special_t* special, size_t* ns)
 {
-    // realtime timer
-    uint64_t system_clock_time = 0;
-    if(s->host_timestamp_mode == 2) {
-        system_clock_time = get_micro_time();
-#ifdef EDVS_LOG_ULTRA
-        printf("Time: %ld\n", system_clock_time);
-#endif
-    }
-    // constants
-    const int timestamp_mode = (s->device_timestamp_mode > 3) ? 0 : s->device_timestamp_mode;
-    const unsigned char cHighBitMask = 0x80; // 10000000
-    const unsigned char cLowerBitsMask = 0x7F; // 01111111
-    const unsigned int cNumBytesTimestamp = (s->device_timestamp_mode == 0) ? 0 : (s->device_timestamp_mode + 1);
-    const uint64_t cTimestampLimit = timestamp_limit(timestamp_mode);
-    const unsigned int cNumBytesPerEvent = 2 + cNumBytesTimestamp;
-    const unsigned int cNumBytesPerSpecial = 2 + cNumBytesTimestamp + 1 + 16;
-    const unsigned int cNumBytesAhead = (cNumBytesPerEvent > cNumBytesPerSpecial) ? cNumBytesPerEvent : cNumBytesPerSpecial;
-    // read bytes
-    unsigned char* buffer_begin = s->buffer;
-    unsigned char* buffer = buffer_begin;
-    size_t num_bytes_events = n*cNumBytesPerEvent;
-    size_t num_bytes_buffer = s->length - s->offset;
-    size_t num_read = (num_bytes_buffer < num_bytes_events ? num_bytes_buffer : num_bytes_events);
-    ssize_t bytes_read = edvs_device_read(s->device, buffer + s->offset, num_read);
-#ifdef EDVS_LOG_ULTRA
-    printf("Read %zd bytes from device\n", bytes_read);
-    {
-        for(ssize_t i=0; i<bytes_read; i++) {
-            printf("%c", *(buffer + s->offset + i));
-        }
-        printf("\n");
-        // char* tmp = malloc(bytes_read + 1);
-        // memcpy(buffer + s->offset, tmp, bytes_read);
-        // tmp[bytes_read] = '\0';
-        // printf("%s\n", tmp);
-        // free(tmp);
-    }
-#endif
-    size_t num_special = 0;
-    if(bytes_read < 0) {
-        return bytes_read;
-    }
-    bytes_read += s->offset;
     // parse events
     ssize_t i = 0; // index of current byte
     edvs_event_t* event_it = events;
@@ -619,58 +521,6 @@ ssize_t edvs_device_streaming_read(edvs_device_streaming_t* s, edvs_event_t* eve
 //      printf("%p %zd\n", s, timestamp);
         // advance byte count
         i += cNumBytesTimestamp;
-        // compute event time
-//      if(s->host_timestamp_mode == 2) {
-//          // compute time since last
-//          // FIXME this does not assure that timestamps are increasing!!!
-//          uint64_t dt;
-//          if(timestamp < s->last_timestamp) {
-//              // we have a wrap
-//              dt = cTimestampLimit + timestamp - s->last_timestamp;
-//          }
-//          else {
-//              // we do not have a wrap
-//              // OR long time no event => ignore
-//              dt = s->last_timestamp - timestamp;
-//          }
-//          s->current_time = system_clock_time + dt;
-//          s->last_timestamp = timestamp;
-//          // // OLD
-//          // if(s->last_timestamp == cTimestampLimit) {
-//          // //   // start event time at zero
-//          // //   // FIXME this is problematic with multiple event streams
-//          // //   //       as they will have different offsets
-//          // //   s->last_timestamp = system_clock_time;
-//          //  s->last_timestamp = 0; // use system clock time zero point
-//          // }
-//          // s->current_time = system_clock_time;
-//          // s->last_timestamp = system_clock_time;
-//      }
-//      else if(s->host_timestamp_mode == 1) {
-//          if(timestamp_mode != 0) {
-//              if(s->current_time < 8) { // ignore timestamps of first 8 events
-//                  s->current_time ++;
-//              }
-//              else {
-//                  if(s->last_timestamp != cTimestampLimit) {
-//                      // FIXME possible errors for 16 bit timestamps if no event for more than 65 ms
-//                      // FIXME possible errors for 24/32 bit timestamps if timestamp is wrong
-//                      if(timestamp >= s->last_timestamp) {
-//                          s->current_time += (timestamp - s->last_timestamp);
-//                      }
-//                      else {
-//                          // s->current_time += 2 * timestamp;
-//                          s->current_time += timestamp + (cTimestampLimit - s->last_timestamp);
-//                      }
-//                  }
-//              }
-//          }
-// //           printf("old=%lu \tnew=%lu \tt=%lu\n", s->last_timestamp, timestamp, s->current_time);
-//          s->last_timestamp = timestamp;
-//      }
-//      else {
-//          s->current_time = timestamp;
-//      }
 
         if(special != 0 && ns != 0 && a == 0 && b == 0) {
             // create special
@@ -746,7 +596,7 @@ ssize_t edvs_device_streaming_read(edvs_device_streaming_t* s, edvs_event_t* eve
     return num_events;
 }
 
-int edvs_device_streaming_write(edvs_device_streaming_t* s, const char* cmd, size_t n)
+int dvs128_device_streaming_write(edvs_device_streaming_t* s, const char* cmd, size_t n)
 {
     if(edvs_device_write(s->device, cmd, n) != n)
         return -1;
@@ -755,119 +605,9 @@ int edvs_device_streaming_write(edvs_device_streaming_t* s, const char* cmd, siz
 
 int edvs_device_streaming_stop(edvs_device_streaming_t* s)
 {
-    int r = edvs_device_streaming_write(s, "E-\n", 3);
+    int r = dvs128_device_streaming_write(s, "E-\n", 3);
     if(r != 0) return r;
     free(s->buffer);
-    free(s);
-    return 0;
-}
-
-// ----- ----- ----- ----- ----- ----- ----- ----- ----- //
-
-ssize_t dvs128_file_read(FILE* fh, dvs128_event_t* events, size_t n)
-{
-    return fread((void*)events, sizeof(dvs128_event_t), n, fh);
-}
-
-ssize_t dvs128_file_write(FILE* fh, const dvs128_event_t* events, size_t n)
-{
-    size_t m = fwrite((const void*)events, sizeof(dvs128_event_t), n, fh);
-    if(m != n) {
-        printf("dvs128_file_write: could not write to file\n");
-        return -1;
-    }
-    return m;
-}
-
-// ----- ----- ----- ----- ----- ----- ----- ----- ----- //
-
-#include <time.h>
-
-edvs_file_streaming_t* edvs_file_streaming_open(const char* filename, uint64_t dt, float ts)
-{
-    edvs_file_streaming_t *s = (edvs_file_streaming_t*)malloc(sizeof(edvs_file_streaming_t));
-    if(s == 0) {
-        return 0;
-    }
-    s->fh = fopen(filename, "rb");
-    s->is_eof = 0;
-    s->dt = dt;
-    s->timescale = ts;
-    s->num_max = 1024;
-    s->unprocessed = (edvs_event_t*)malloc(s->num_max*sizeof(edvs_event_t));
-    s->num_curr = 0;
-    s->is_first = 1;
-    s->start_time = 0;
-    s->start_event_time = 0;
-    s->current_event_time = 0;
-    return s;
-}
-
-int edvs_file_streaming_run(edvs_file_streaming_t* s)
-{
-    s->start_time = clock();
-    return 0;
-}
-
-ssize_t edvs_file_streaming_read(edvs_file_streaming_t* s, edvs_event_t* events, size_t events_max)
-{
-    if(s->is_eof) {
-        return 0;
-    }
-    // get time
-    if(s->dt == 0) {
-        uint64_t nt = ((clock() - s->start_time)*1000000)/CLOCKS_PER_SEC;
-        s->current_event_time = s->start_event_time + (uint64_t)(s->timescale*(float)(nt));
-    }
-    else {
-        s->current_event_time += s->dt;
-    }
-    size_t num_total = 0;
-    do {
-        // read more from stream
-        if(s->num_curr == 0) {
-            s->num_curr = edvs_file_read(s->fh, s->unprocessed, s->num_max);
-            if(s->num_curr == 0) {
-                s->is_eof = 1;
-            }
-        }
-        if(s->is_first) {
-            s->start_event_time = s->unprocessed[0].t;
-            s->current_event_time = s->start_event_time;
-            s->is_first = 0;
-        }
-        // find first event with time greater equal to desires time
-        size_t n = 0;
-        //printf("ti=%ld\n",s->unprocessed[n].t);
-        while( n < s->num_curr
-            && num_total < events_max
-            && s->unprocessed[n].t < s->current_event_time
-        ) {
-            n++;
-            num_total++;
-        }
-        // copy events to output buffer
-        memcpy(
-            (void*)events,
-            (const void*)s->unprocessed,
-            n*sizeof(edvs_event_t));
-        events += n;
-        // move remaining events in unprocessed buffer to start
-        memmove(
-            (void*)s->unprocessed,
-            (const void*)(s->unprocessed + n),
-            (s->num_curr - n)*sizeof(edvs_event_t));
-        s->num_curr -= n;
-    }
-    while(s->num_curr == 0 && s->is_eof != 1);
-    //printf("num_total=%zd\n",num_total);
-    return num_total;
-}
-
-int edvs_file_streaming_stop(edvs_file_streaming_t* s)
-{
-    fclose(s->fh);
-    free(s->unprocessed);
     free(s);
     return 0;
 }
@@ -877,283 +617,43 @@ int edvs_file_streaming_stop(edvs_file_streaming_t* s)
 #include <stdint.h>
 #include <string.h>
 
-int get_uri_type(const char* uri)
+// functions below are used in EvenStream.cpp
+
+
+
+dvs128_stream_handle dvs128_open()
 {
-    // check for a ':' -> network socket
-    if(strstr(uri, ":") != NULL) {
-        return 1;
+
+    caerDeviceHandle dvs128_handle = caerDeviceOpen(1, CAER_DEVICE_DVS128, 0, 0, NULL);
+    if (dvs128_handle == NULL) {
+        printf("dvs128_open: unable to open dvs128")
+        return (EXIT_FAILURE);
     }
-    // check for 'baudrate' -> serial
-    if(strstr(uri, "baudrate") != NULL) {
-        return 2;
-    }
-    // otherwise
-    return 3;
+    return caerDeviceOpen(1, CAER_DEVICE_DVS128, 0, 0, NULL);
 }
 
-int parse_uri_net(const char* curi, char** ip, int* port, int* dtsm, int* htsm, int* msmode)
-{
-    // Example URI:
-    //   192.168.201.62:56001?dtsm=1&htsm=1
 
-    // default
-    *ip = NULL;
-    *port = 0;
-    *dtsm = 2;
-    *htsm = 1;
-    *msmode = 0;
-    // local copy of uri
-    char* uri = malloc(strlen(curi)+1);
-    strcpy(uri, curi);
-    // parse ip
-    char* sip = strtok(uri, ":");
-    if(sip == NULL) {
-        return 0;
-    }
-    *ip = malloc(strlen(sip)+1);
-    strcpy(*ip, sip);
-    // parse port
-    char* sport = strtok(NULL, "?");
-    if(sport == NULL) {
-        return 0;
-    }
-    *port = atoi(sport);
-    // parse query tokens
-    char* token = strtok(NULL, "=");
-    while(token != NULL) {
-        // find = in token and delete
-        char* val = strtok(NULL, "&");
-        // check which token we are parsing
-        if(strcmp(token,"dtsm")==0) {
-            *dtsm = atoi(val);
-        }
-        else if(strcmp(token,"htsm")==0) {
-            *htsm = atof(val);
-        }
-        else if(strcmp(token,"msmode")==0) {
-            *msmode = atoi(val);
-        }
-        else {
-            printf("ERROR in parse_uri_file: Invalid URI token '%s'!\n", token);
-            return 0;
-        }
-        // next token
-        token = strtok(NULL, "=");
-    }
-    return 1;
+int dvs128_run(dvs128_stream_handle s)
+{
+    dvs128_device_streaming_t* ds = (dvs128_device_streaming_t*)s->handle;
+    return dvs128_device_streaming_run(ds);
 }
 
-int parse_uri_device(const char* curi, char** name, int* baudrate, int* dtsm, int* htsm, int* msmode)
+int dvs128_close(dvs128_stream_handle s)
 {
-    // Example URI:
-    //   /dev/ttyUSB0?baudrate=4000000&dtsm=1&htsm=1
-
-    // default
-    *name = NULL;
-    *baudrate = 4000000;
-    *dtsm = 2;
-    *htsm = 1;
-    *msmode = 0;
-    // local copy of uri
-    char* uri = malloc(strlen(curi)+1);
-    strcpy(uri, curi);
-    // parse name
-    char* sname = strtok(uri, "?");
-    if(sname == NULL) {
-        return 0;
-    }
-    *name = malloc(strlen(sname)+1);
-    strcpy(*name, sname);
-    // parse query tokens
-    char* token = strtok(NULL, "=");
-    while(token != NULL) {
-        // find = in token and delete
-        char* val = strtok(NULL, "&");
-        // check which token we are parsing
-        if(strcmp(token,"baudrate")==0) {
-            *baudrate = atoi(val);
-        }
-        else if(strcmp(token,"dtsm")==0) {
-            *dtsm = atoi(val);
-        }
-        else if(strcmp(token,"htsm")==0) {
-            *htsm = atof(val);
-        }
-        else if(strcmp(token,"msmode")==0) {
-            *msmode = atoi(val);
-        }
-        else {
-            printf("ERROR in parse_uri_file: Invalid URI token '%s'!\n", token);
-            return 0;
-        }
-        // next token
-        token = strtok(NULL, "=");
-    }
-    return 1;
+    dvs128_device_streaming_t* ds = (dvs128_device_streaming_t*)s->handle;
+    dvs128_device_t* dh = ds->device;
+    dvs128_device_streaming_stop(ds);
+    dvs128_device_close(dh);
+    free(s);
+    return 0;
 }
 
-int parse_uri_file(const char* curi, char** fn, uint64_t* dt, float* ts)
+int dvs128_is_live(dvs128_stream_handle s)
 {
-    // Example URI:
-    //   /home/david/data/test.tsv?dt=0&ts=0.1
-
-    // default
-    *fn = NULL;
-    *dt = 0;
-    *ts = 1.0f;
-    // local copy of uri
-    char* uri = malloc(strlen(curi)+1);
-    strcpy(uri, curi);
-    // parse name
-    char* sfn = strtok(uri, "?");
-    if(sfn == NULL) {
-        return 0;
-    }
-    *fn = malloc(strlen(sfn)+1);
-    strcpy(*fn, sfn);
-    // parse query tokens
-    char* token = strtok(NULL, "=");
-    while(token != NULL) {
-        // find = in token and delete
-        char* val = strtok(NULL, "&");
-        // check which token we are parsing
-        if(strcmp(token,"dt")==0) {
-            *dt = atoi(val);
-        }
-        else if(strcmp(token,"ts")==0) {
-            *ts = atof(val);
-        }
-        else {
-            printf("ERROR in parse_uri_file: Invalid URI token '%s'!\n", token);
-            return 0;
-        }
-        // next token
-        token = strtok(NULL, "=");
-    }
-    return 1;
-}
-
-edvs_stream_handle edvs_open(const char* uri)
-{
-    int uri_type = get_uri_type(uri);
-    if(uri_type == 1) {
-        // parse URI
-        char* ip;
-        int port, dtsm, htsm, msmode;
-        if(parse_uri_net(uri, &ip, &port, &dtsm, &htsm, &msmode) == 0) {
-            printf("edvs_open: Failed to parse URI\n");
-            free(ip);
-            return 0;
-        }
-        // open device
-        printf("Opening network socket: ip=%s, port=%d using device_tsm=%d, host_tsm=%d, master/slave=%d\n", ip, port, dtsm, htsm, msmode);
-        int dev = edvs_net_open(ip, port);
-        if(dev < 0) {
-            free(ip);
-            printf("edvs_open: URI seems to point to a network socket, but connection failed\n");
-            return 0;
-        }
-        free(ip);
-        // start streaming
-        edvs_device_t* dh = (edvs_device_t*)malloc(sizeof(edvs_device_t));
-        dh->type = EDVS_NETWORK_DEVICE;
-        dh->handle = dev;
-        edvs_device_streaming_t* ds = edvs_device_streaming_open(dh, dtsm, htsm, msmode);
-        struct edvs_stream_t* s = (struct edvs_stream_t*)malloc(sizeof(struct edvs_stream_t));
-        s->type = EDVS_DEVICE_STREAM;
-        s->handle = (uintptr_t)ds;
-        return s;
-    }
-    else if(uri_type == 2) {
-        // parse URI
-        char* port;
-        int baudrate, dtsm, htsm, msmode;
-        if(parse_uri_device(uri, &port, &baudrate, &dtsm, &htsm, &msmode) == 0) {
-            printf("edvs_open: Failed to parse URI\n");
-            free(port);
-            return 0;
-        }
-        // open device
-        printf("Opening serial port: port=%s using baudrate=%d, device_tsm=%d, host_tsm=%d, master/slave=%d\n", port, baudrate, dtsm, htsm, msmode);
-        int dev = edvs_serial_open(port, baudrate);
-        if(dev < 0) {
-            free(port);
-            printf("edvs_open: URI seems to point to a serial port, but connection failed\n");
-            return 0;
-        }
-        free(port);
-        // start streaming
-        edvs_device_t* dh = (edvs_device_t*)malloc(sizeof(edvs_device_t));
-        dh->type = EDVS_SERIAL_DEVICE;
-        dh->handle = dev;
-        edvs_device_streaming_t* ds = edvs_device_streaming_open(dh, dtsm, htsm, msmode);
-        struct edvs_stream_t* s = (struct edvs_stream_t*)malloc(sizeof(struct edvs_stream_t));
-        s->type = EDVS_DEVICE_STREAM;
-        s->handle = (uintptr_t)ds;
-        return s;
-    }
-    // else -> file
-    else if(uri_type == 3) {
-        // parse URI
-        char* fn;
-        uint64_t dt;
-        float ts;
-        if(parse_uri_file(uri, &fn, &dt, &ts) == 0) {
-            printf("edvs_open: Failed to parse URI\n");
-            free(fn);
-            return 0;
-        }
-        // open
-        printf("Opening event file '%s' using dt=%lu, ts=%f\n", fn, dt, ts);
-        edvs_file_streaming_t* ds = edvs_file_streaming_open(fn, dt, ts);
-        free(fn);
-        struct edvs_stream_t* s = (struct edvs_stream_t*)malloc(sizeof(struct edvs_stream_t));
-        s->type = EDVS_FILE_STREAM;
-        s->handle = (uintptr_t)ds;
-        return s;
-    }
-    else {
-        printf("edvs_open: Could not identify URI type (net/device/file)\n");
-        return 0;
-    }
-}
-
-int edvs_run(edvs_stream_handle s)
-{
-    if(s->type == EDVS_DEVICE_STREAM) {
-        edvs_device_streaming_t* ds = (edvs_device_streaming_t*)s->handle;
-        return edvs_device_streaming_run(ds);
-    }
-    if(s->type == EDVS_FILE_STREAM) {
-        edvs_file_streaming_t* ds = (edvs_file_streaming_t*)s->handle;
-        return edvs_file_streaming_run(ds);
-    }
-    printf("edvs_run: unknown stream type\n");
-    return -1;
-}
-
-int edvs_close(edvs_stream_handle s)
-{
-    if(s->type == EDVS_DEVICE_STREAM) {
-        edvs_device_streaming_t* ds = (edvs_device_streaming_t*)s->handle;
-        edvs_device_t* dh = ds->device;
-        edvs_device_streaming_stop(ds);
-        edvs_device_close(dh);
-        free(s);
-        return 0;
-    }
-    if(s->type == EDVS_FILE_STREAM) {
-        edvs_file_streaming_t* ds = (edvs_file_streaming_t*)s->handle;
-        edvs_file_streaming_stop(ds);
-        free(s);
-        return 0;
-    }
-    printf("edvs_close: unknown stream type\n");
-    return -1;
-}
-
-int edvs_is_live(edvs_stream_handle s)
-{
+    // first try streaming from the device directly
+    return 1; // this is a huge hack
+    /*
     if(s->type == EDVS_DEVICE_STREAM) {
         return 1;
     }
@@ -1162,10 +662,13 @@ int edvs_is_live(edvs_stream_handle s)
     }
     printf("edvs_is_live: unknown stream type\n");
     return -1;
+    */
 }
 
-int edvs_eos(edvs_stream_handle s)
+int dvs128_eos(dvs128_stream_handle s)
 {
+    return 0; // devices continuously keep giving events
+    /*
     if(s->type == EDVS_DEVICE_STREAM) {
         // TODO can device streams reach end of stream?
         return 0;
@@ -1176,10 +679,14 @@ int edvs_eos(edvs_stream_handle s)
     }
     printf("edvs_eos: unknown stream type\n");
     return -1;
+    */
 }
 
-int edvs_get_master_slave_mode(edvs_stream_handle s)
+int dvs128_get_master_slave_mode(dvs128_stream_handle s)
 {
+    dvs128_device_streaming_t* ds = (dvs128_device_streaming_t*)s->handle;
+    return ds->master_slave_mode;
+    /*
     if(s->type == EDVS_DEVICE_STREAM) {
         edvs_device_streaming_t* ds = (edvs_device_streaming_t*)s->handle;
         return ds->master_slave_mode;
@@ -1189,15 +696,19 @@ int edvs_get_master_slave_mode(edvs_stream_handle s)
     }
     printf("edvs_get_master_slave_mode: unknown stream type\n");
     return -1;
+    */
 }
 
-ssize_t edvs_read(edvs_stream_handle s, edvs_event_t* events, size_t n)
+ssize_t dvs128_read(dvs128_stream_handle s, dvs128_event_t* events, size_t n)
 {
-    return edvs_read_ext(s, events, n, 0, 0);
+    return dvs128_read_ext(s, events, n, 0, 0);
 }
 
-ssize_t edvs_read_ext(edvs_stream_handle s, edvs_event_t* events, size_t n, edvs_special_t* special, size_t* ns)
+ssize_t dvs128_read_ext(dvs128_stream_handle s, dvs128_event_t* events, size_t n, dvs128_special_t* special, size_t* ns)
 {
+    dvs128_device_streaming_t* ds = (dvs128_device_streaming_t*)s->handle;
+    return dvs128_device_streaming_read(ds, events, n, special, ns);
+    /*
     if(s->type == EDVS_DEVICE_STREAM) {
         edvs_device_streaming_t* ds = (edvs_device_streaming_t*)s->handle;
         return edvs_device_streaming_read(ds, events, n, special, ns);
@@ -1211,10 +722,14 @@ ssize_t edvs_read_ext(edvs_stream_handle s, edvs_event_t* events, size_t n, edvs
     }
     printf("edvs_read: unknown stream type\n");
     return -1;
+    */
 }
 
-ssize_t edvs_write(edvs_stream_handle s, const char* cmd, size_t n)
+ssize_t dvs128_write(dvs128_stream_handle s, const char* cmd, size_t n)
 {
+    dvs128_device_streaming_t* ds = (dvs128_device_streaming_t*)s->handle;
+    return dvs128_device_streaming_write(ds, cmd, n);
+    /**
     if(s->type == EDVS_DEVICE_STREAM) {
         edvs_device_streaming_t* ds = (edvs_device_streaming_t*)s->handle;
         return edvs_device_streaming_write(ds, cmd, n);
@@ -1225,4 +740,5 @@ ssize_t edvs_write(edvs_stream_handle s, const char* cmd, size_t n)
     }
     printf("edvs_write: unknown stream type\n");
     return -1;
+    */
 }

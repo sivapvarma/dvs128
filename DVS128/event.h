@@ -12,10 +12,10 @@ extern "C" {
  * Struct uses 14 bytes of data.
  */
 typedef struct {
-	uint64_t t;
-	uint16_t x, y;
-	uint8_t parity;
-	uint8_t id;
+	uint64_t t; // timestamp
+	uint16_t x, y; // x, y coordinate of pixel
+	uint8_t parity; // polarity 1/0
+	uint8_t id; // device id
 } dvs128_event_t;
 
 /** An edvs special data block */

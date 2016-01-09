@@ -14,14 +14,14 @@ namespace dvs128
     class SingleEventStream : public IEventStream
     {
     public:
-        SingleEventStream() {}
+        // SingleEventStream() {}
 
         SingleEventStream(const SingleEventStream&) = delete;
         SingleEventStream& operator=(const SingleEventStream&) = delete;
 
-        SingleEventStream(const std::string& uri)
+        SingleEventStream()
         {
-            open(uri);
+            open();
             if(is_open()) {
                 run();
             }
@@ -32,9 +32,10 @@ namespace dvs128
             close();
         }
 
-        void open(const std::string& uri)
+        // void open(const std::string& uri)
+        void open()
         {
-            h = dvs128_open(uri.c_str());
+            h = dvs128_open();
         }
 
         void close()
@@ -116,7 +117,7 @@ namespace dvs128
             events_ = {};
             return tmp;
         }
-        
+
         void runImpl()
         {
             std::vector<dvs128_event_t> v;
@@ -133,7 +134,7 @@ namespace dvs128
                 events_.insert(events_.end(), v.begin(), v.end());
             }
         }
-        
+
     private:
         bool is_running_;
         std::thread thread_;
