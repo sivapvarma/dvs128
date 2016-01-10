@@ -6,7 +6,7 @@
 
 const unsigned int RetinaSize = 128;
 const int cDecay = 24;
-const int cDisplaySize = 128;// 4*128;
+const int cDisplaySize = 4*128;
 const int cUpdateInterval = 10;
 const int cDisplayInterval = 16;
 
@@ -87,7 +87,7 @@ void EdvsVisual::Update()
         if(e.id >= items_.size() || !items_[e.id].label) {
             addItem(e.id);
         }
-        items_[e.id].image.setPixel(e.x, e.y, e.parity ? cColorOn : cColorOff);
+        items_[e.id].image.setPixel(128-e.x, 128-e.y, e.parity ? cColorOn : cColorOff);
     }
 }
 
@@ -123,8 +123,8 @@ void EdvsVisual::Display()
         // rescale so that we see more :) and display
         // debug
         std::cout << "before setting pixmap.\n";
-        // i.label->setPixmap(QPixmap::fromImage(i.image.scaled(cDisplaySize, cDisplaySize)));
-        i.label->setPixmap(QPixmap::fromImage(i.image));
+        i.label->setPixmap(QPixmap::fromImage(i.image.scaled(cDisplaySize, cDisplaySize)));
+        // i.label->setPixmap(QPixmap::fromImage(i.image));
     }
 }
 

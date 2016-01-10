@@ -174,10 +174,10 @@ namespace dvs128
                             // loop over events
                             caerPolarityEvent ev = caerPolarityEventPacketGetEvent(polarity, j);
                             v[j].t = caerPolarityEventGetTimestamp(ev);
-                            v[j].x = caerPolarityEventGetY(ev);
-                            v[j].y = caerPolarityEventGetX(ev);
+                            v[j].x = caerPolarityEventGetX(ev);
+                            v[j].y = caerPolarityEventGetY(ev);
                             v[j].parity = caerPolarityEventGetPolarity(ev);
-                            v[j].id = 1; // hack
+                            v[j].id = 0; // hack
                         }
 
                     // }
