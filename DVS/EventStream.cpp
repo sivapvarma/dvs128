@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <memory>
 #include <limits>
+#include <iostream>
 
 // libcaer
 #include <libcaer/libcaer.h>
@@ -112,6 +113,7 @@ namespace dvs128
                 if(!v.empty()) {
                     last_time_ = v.back().t;
                 }
+                std::cout << "events returned\n";
                 return v;
             }
         }
@@ -162,30 +164,23 @@ namespace dvs128
                     ssize_t m = caerEventPacketHeaderGetEventNumber(packetHeader);
                     v.resize(m);
                     printf("Packet %d of type %d -> size is %d.\n", i, caerEventPacketHeaderGetEventType(packetHeader), m);
-                    // Packet 0 is always the special events packet for DVS128, while packet is the polarity events packet.
-                    if (i == POLARITY_EVENT) {
+                    // Packet 0 is always the special events packet for DVS128
+                    // while packet is the polarity events packet.
+                    // if (i == POLARITY_EVENT)
+                    // {
                         caerPolarityEventPacket polarity = (caerPolarityEventPacket) packetHeader;
                         for(int j=0; j<m; j++)
                         {
                             // loop over events
                             caerPolarityEvent ev = caerPolarityEventPacketGetEvent(polarity, j);
                             v[j].t = caerPolarityEventGetTimestamp(ev);
-                            v[j].x = caerPolarityEventGetX(ev);
-                            v[j].y = caerPolarityEventGetY(ev);
+                            v[j].x = caerPolarityEventGetY(ev);
+                            v[j].y = caerPolarityEventGetX(ev);
                             v[j].parity = caerPolarityEventGetPolarity(ev);
                             v[j].id = 1; // hack
                         }
 
-                        // // Get full timestamp and addresses of first event.
-                        // caerPolarityEvent firstEvent = caerPolarityEventPacketGetEvent(polarity, 0);
-
-                        // int32_t ts = caerPolarityEventGetTimestamp(firstEvent);
-                        // uint16_t x = caerPolarityEventGetX(firstEvent);
-                        // uint16_t y = caerPolarityEventGetY(firstEvent);
-                        // bool pol = caerPolarityEventGetPolarity(firstEvent);
-
-                        // // printf("First polarity event - ts: %d, x: %d, y: %d, pol: %d.\n", ts, x, y, pol);
-                    }
+                    // }
                 }
 
                 caerEventPacketContainerFree(packetContainer);

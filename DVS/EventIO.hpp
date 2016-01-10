@@ -8,9 +8,9 @@
 namespace dvs128
 {
 
-	void SaveEvents(const std::string& fn, const std::vector<Event>& v);
+    void SaveEvents(const std::string& fn, const std::vector<Event>& v);
 
-	std::vector<Event> LoadEvents(const std::string& fn);
+    std::vector<Event> LoadEvents(const std::string& fn);
 
 }
 

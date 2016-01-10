@@ -44,18 +44,18 @@ typedef struct {
 
 /** Device streaming parameters and state */
 typedef struct {
-	dvs128_device_t* device;
-	int device_timestamp_mode;
-	int host_timestamp_mode;
-	int master_slave_mode;
-	unsigned char* buffer;
-	size_t length;
-	size_t offset;
-//	uint64_t current_time;
-//	uint64_t last_timestamp;
-	uint64_t ts_last_device;
-	uint64_t ts_last_host;
-	uint64_t systime_offset;
+    dvs128_device_t* device;
+    int device_timestamp_mode;
+    int host_timestamp_mode;
+    int master_slave_mode;
+    unsigned char* buffer;
+    size_t length;
+    size_t offset;
+//  uint64_t current_time;
+//  uint64_t last_timestamp;
+    uint64_t ts_last_device;
+    uint64_t ts_last_host;
+    uint64_t systime_offset;
 } dvs128_device_streaming_t;
 
 /** Opens an edvs event stream
