@@ -19,7 +19,7 @@ extern "C" {
 // caerDeviceHandle dvs128_handle;
 
 // dvs stream type
-typdef enum { DVS128_DEVICE_STREAM, DVS128_FILE_STREAM } stream_type;
+//typdef enum { DVS128_DEVICE_STREAM, DVS128_FILE_STREAM } stream_type;
 
 struct dvs128_stream_t {
     // stream_type type;

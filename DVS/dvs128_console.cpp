@@ -11,7 +11,7 @@ static atomic_bool globalShutdown = ATOMIC_VAR_INIT(false);
 
 static void globalShutdownSignalHandler(int signal)
 {
-    // simply se the running flag to a false on SIGTERM and SIGINT(CTRL+C)
+    // simply use the running flag to a false on SIGTERM and SIGINT(CTRL+C)
     // for global shutdown
     if ( signal==SIGTERM || signal==SIGINT )
     {

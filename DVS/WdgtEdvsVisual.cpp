@@ -1,5 +1,5 @@
 #include "WdgtEdvsVisual.h"
-#include <Edvs/EventIO.hpp>
+#include "EventIO.hpp"
 #include <QtGui/QFileDialog>
 #include <iostream>
 
@@ -20,9 +20,9 @@ const QRgb cColorMid = qRgb(128, 128, 128);
 const QRgb cColorOn = qRgb(255, 255, 255);
 const QRgb cColorOff = qRgb(0, 0, 0);
 
-EdvsVisual::EdvsVisual(const std::shared_ptr<Edvs::IEventStream>& stream, QWidget *parent)
+EdvsVisual::EdvsVisual(const std::shared_ptr<dvs128::IEventStream>& stream, QWidget *parent)
 :	QWidget(parent),
-	edvs_event_stream_(stream)
+	dvs128_event_stream_(stream)
 {
 	ui.setupUi(this);
 
@@ -55,7 +55,7 @@ void EdvsVisual::OnButton()
 		// get filename
 		QString fn = QFileDialog::getSaveFileName(this, "Select file to save recording");
 		if(fn != "") {
-			Edvs::SaveEvents(fn.toStdString(), events_recorded_);
+			dvs128::SaveEvents(fn.toStdString(), events_recorded_);
 			std::cout << "Saved " << events_recorded_.size() << " events to file '" << fn.toStdString() << "'" << std::endl;
 		}
 		events_recorded_.clear();
@@ -65,7 +65,7 @@ void EdvsVisual::OnButton()
 void EdvsVisual::Update()
 {
 	// read events
-	auto events = edvs_event_stream_->read();
+	auto events = dvs128_event_stream_->read();
 
 	if(is_recording_) {
 		events_recorded_.insert(events_recorded_.end(), events.begin(), events.end());
@@ -82,7 +82,7 @@ void EdvsVisual::Update()
 	}
 
 	// write events to image
-	for(const Edvs::Event& e : events) {
+	for(const dvs128::Event& e : events) {
 		if(e.id >= items_.size() || !items_[e.id].label) {
 			addItem(e.id);
 		}

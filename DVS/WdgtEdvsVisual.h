@@ -4,7 +4,7 @@
 #include <QtGui/QWidget>
 #include <QtCore/QTimer>
 #include "ui_WdgtEdvsVisual.h"
-#include <Edvs/EventStream.hpp>
+#include "EventStream.hpp"
 #include <vector>
 
 class EdvsVisual : public QWidget
@@ -12,7 +12,7 @@ class EdvsVisual : public QWidget
     Q_OBJECT
 
 public:
-	EdvsVisual(const std::shared_ptr<Edvs::IEventStream>& stream, QWidget *parent = 0);
+	EdvsVisual(const std::shared_ptr<dvs128::IEventStream>& stream, QWidget *parent = 0);
 	~EdvsVisual();
 
 public Q_SLOTS:
@@ -24,7 +24,7 @@ private:
 	void addItem(uint8_t id);
 
 private:
-	std::shared_ptr<Edvs::IEventStream> edvs_event_stream_;
+	std::shared_ptr<dvs128::IEventStream> dvs128_event_stream_;
 	QTimer timer_update_;
 	QTimer timer_display_;
 
@@ -36,7 +36,7 @@ private:
 	std::vector<Item> items_;
 
 	bool is_recording_;
-	std::vector<Edvs::Event> events_recorded_;
+	std::vector<dvs128::Event> events_recorded_;
 
 private:
     Ui::EdvsVisualClass ui;
